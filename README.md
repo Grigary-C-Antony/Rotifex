@@ -1,11 +1,11 @@
 ![banner](https://raw.githubusercontent.com/Grigary-C-Antony/Rotifex/master/banner-1.png)
 
-# Rotifex — Complete Documentation Source
+# Rotifex
 
-> This file is the single source of truth for generating full product documentation.
-> It is structured for compatibility with Docusaurus, Mintlify, GitBook, and similar systems.
+> open the documentaion at [Docs](https://rotifex-docs.vercel.app/)
 
 ---
+
 ## Installation
 
 ```bash
@@ -26,9 +26,9 @@ npx rotifex start
 
 ## Commands
 
-| Command   | Description                          |
-| --------- | ------------------------------------ |
-| `start`   | Start the Rotifex development server |
+| Command | Description                          |
+| ------- | ------------------------------------ |
+| `start` | Start the Rotifex development server |
 
 ## Table of Contents
 
