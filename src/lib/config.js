@@ -1,5 +1,9 @@
 import { readFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Package root — used to locate files shipped inside the package (config.default.json)
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Load a .env file and inject any missing keys into process.env.
@@ -101,7 +105,9 @@ function applyEnvOverrides(config) {
  * @returns {object}
  */
 export function loadConfig(opts = {}) {
-  const defaults  = readJSON('config.default.json');
+  // config.default.json lives inside the package — resolve from package dir
+  const defaults  = readJSON(join(__dirname, '../../config.default.json'));
+  // config.json is the user's override — resolve from their working directory
   const userConf  = readJSON('config.json');
   const merged    = deepMerge(deepMerge({}, defaults), userConf);
 

@@ -8,12 +8,16 @@
   },
   "files": [
     "bin",
-    "src"
+    "src",
+    "admin/dist",
+    "config.default.json"
   ],
   "scripts": {
-    "start": "node bin/rotifex.js",
+    "start": "node bin/rotifex.js start",
+    "dev": "node bin/rotifex.js start --verbose",
     "build:admin": "cd admin && npx vite build",
     "dev:admin": "cd admin && npx vite",
+    "prepublishOnly": "npm run build:admin",
     "postinstall": "npm rebuild better-sqlite3"
   },
   "keywords": [

@@ -83,7 +83,8 @@ export async function createServer(config) {
   await app.register(adminRoutes, { db });
 
   // ── SPA (served at /) ────────────────────────────────────────────────
-  const adminDist = resolve('admin/dist');
+  // Resolve admin/dist from the package directory so it works when installed via npx/npm
+  const adminDist = join(__dirname, '../../admin/dist');
   if (existsSync(adminDist)) {
     const fastifyStatic = (await import('@fastify/static')).default;
     await app.register(fastifyStatic, {
