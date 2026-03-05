@@ -1,0 +1,44 @@
+{
+  "name": "rotifex",
+  "version": "0.1.0",
+  "description": "Rotifex — a modern CLI toolkit for project scaffolding, development, and migrations.",
+  "type": "module",
+  "bin": {
+    "rotifex": "./bin/rotifex.js"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "scripts": {
+    "start": "node bin/rotifex.js",
+    "build:admin": "cd admin && npx vite build",
+    "dev:admin": "cd admin && npx vite",
+    "postinstall": "npm rebuild better-sqlite3"
+  },
+  "keywords": [
+    "cli",
+    "rotifex",
+    "scaffold",
+    "migrate"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/multipart": "^9.4.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/static": "^9.0.0",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.6.2",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "fastify": "^5.7.4",
+    "jsonwebtoken": "^9.0.3",
+    "pino-pretty": "^13.1.3",
+    "zod": "^4.3.6"
+  }
+}

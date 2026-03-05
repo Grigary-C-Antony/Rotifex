@@ -1,0 +1,29 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 3000
+  },
+  "cors": {
+    "origin": "*"
+  },
+  "rateLimit": {
+    "max": 100,
+    "timeWindow": "1 minute"
+  },
+  "logging": {
+    "level": "info"
+  },
+  "storage": {
+    "publicDir": "storage/public",
+    "privateDir": "storage/private",
+    "maxFileSizeMB": 10,
+    "maxStoragePerUserMB": 100,
+    "allowedMimeTypes": [
+      "image/jpeg", "image/png", "image/gif", "image/webp",
+      "application/pdf",
+      "text/plain", "text/csv"
+    ],
+    "signedUrlSecret": "change-me-in-production",
+    "signedUrlTTLSeconds": 3600
+  }
+}

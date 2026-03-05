@@ -1,0 +1,16 @@
+{
+  "ac5fd9ce-4ac4-4a38-a7ab-ef472bf8bbdd": {
+    "id": "ac5fd9ce-4ac4-4a38-a7ab-ef472bf8bbdd",
+    "name": "Research agent",
+    "description": "",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "systemPrompt": "",
+    "tools": [],
+    "temperature": 0.7,
+    "maxTokens": 2048,
+    "maxIterations": 10,
+    "createdAt": "2026-03-05T15:01:43.965Z",
+    "updatedAt": "2026-03-05T15:01:43.965Z"
+  }
+}
