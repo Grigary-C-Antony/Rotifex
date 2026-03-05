@@ -1,3 +1,5 @@
+![banner](banner.png)
+
 # Rotifex — Complete Documentation Source
 
 > This file is the single source of truth for generating full product documentation.
