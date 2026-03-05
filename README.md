@@ -9,22 +9,26 @@
 ## Installation
 
 ```bash
-npm install -g rotifex
+npm i rotifex
 ```
 
-Or run directly with `npx`:
+Then start the server:
 
 ```bash
-npx rotifex <command>
+npm start
+```
+
+Or run directly without installing:
+
+```bash
+npx rotifex start
 ```
 
 ## Commands
 
-| Command   | Description                                        |
-| --------- | -------------------------------------------------- |
-| `init`    | Initialize a new Rotifex project                   |
-| `start`   | Start the Rotifex development server               |
-| `migrate` | Run pending migrations                             |
+| Command   | Description                          |
+| --------- | ------------------------------------ |
+| `start`   | Start the Rotifex development server |
 
 ## Table of Contents
 
