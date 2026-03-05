@@ -6,6 +6,25 @@
 > It is structured for compatibility with Docusaurus, Mintlify, GitBook, and similar systems.
 
 ---
+## Installation
+
+```bash
+npm install -g rotifex
+```
+
+Or run directly with `npx`:
+
+```bash
+npx rotifex <command>
+```
+
+## Commands
+
+| Command   | Description                                        |
+| --------- | -------------------------------------------------- |
+| `init`    | Initialize a new Rotifex project                   |
+| `start`   | Start the Rotifex development server               |
+| `migrate` | Run pending migrations                             |
 
 ## Table of Contents
 
