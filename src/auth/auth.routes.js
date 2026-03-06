@@ -1,5 +1,4 @@
 import { makeAuthController } from './auth.controller.js';
-import { ensureAuthSchema } from './auth.service.js';
 
 /**
  * Auth route group — registered under the root prefix.
@@ -15,9 +14,6 @@ import { ensureAuthSchema } from './auth.service.js';
  * @param {{ db: import('../db/adapters/base.js').DatabaseAdapter }} opts
  */
 export async function authRoutes(app, { db }) {
-  // Ensure the password_hash column exists on the users table.
-  ensureAuthSchema(db);
-
   const ctrl = makeAuthController(db);
 
   app.post('/auth/register', (req, reply) => ctrl.register(req, reply));

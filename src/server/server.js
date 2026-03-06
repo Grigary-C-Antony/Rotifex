@@ -10,6 +10,7 @@ import { healthRoutes } from './routes/health.js';
 import { fileRoutes } from './routes/files.js';
 import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from '../auth/auth.routes.js';
+import { ensureAuthSchema } from '../auth/auth.service.js';
 import { aiRoutes } from '../ai/ai.routes.js';
 import { agentRoutes } from '../ai/agent.routes.js';
 import { registerJwtMiddleware } from '../auth/jwt.middleware.js';
@@ -69,6 +70,9 @@ export async function createServer(config) {
 
   // ── Dynamic REST Engine ─────────────────────────────────────────────
   bootstrapEngine(app, db);
+
+  // Ensure password_hash column exists on the users table now that it's created.
+  ensureAuthSchema(db);
 
   // ── File Storage ────────────────────────────────────────────────────
   const storage = new StorageManager(db, config.storage);
