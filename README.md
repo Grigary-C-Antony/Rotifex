@@ -8,7 +8,7 @@
 
 **Self-hosted backend platform. Define a schema, get a full REST API instantly.**
 
-[Documentation](https://rotifex-docs.vercel.app/) · [Full Reference](README-final.md) · [npm](https://www.npmjs.com/package/rotifex)
+[Documentation](https://rotifex-docs.vercel.app/) · [Full Reference](https://github.com/Grigary-C-Antony/Rotifex) · [npm](https://www.npmjs.com/package/rotifex)
 
 </div>
 
