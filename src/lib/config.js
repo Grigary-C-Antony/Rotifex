@@ -97,6 +97,9 @@ function applyEnvOverrides(config) {
   if (env.ROTIFEX_ACCESS_TOKEN_TTL)    { config.auth = config.auth || {}; config.auth.accessTokenTTL    = Number(env.ROTIFEX_ACCESS_TOKEN_TTL); }
   if (env.ROTIFEX_REFRESH_TOKEN_TTL)   { config.auth = config.auth || {}; config.auth.refreshTokenTTL   = Number(env.ROTIFEX_REFRESH_TOKEN_TTL); }
 
+  // Database — external connection string overrides the default SQLite file.
+  if (env.ROTIFEX_DATABASE_URL) config.databaseUrl = env.ROTIFEX_DATABASE_URL;
+
   return config;
 }
 

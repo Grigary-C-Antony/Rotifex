@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
  * Schema-to-SQL type mapping.
  */
 const SQL_TYPE_MAP = {
-  string:  'TEXT',
+  string:  'VARCHAR(255)',  // TEXT cannot have DEFAULT values in MySQL; VARCHAR(255) works on all dialects
   number:  'REAL',
   integer: 'INTEGER',
   boolean: 'INTEGER',   // SQLite stores booleans as 0/1

@@ -77,7 +77,11 @@ export function registerStartCommand(program) {
     .option('--host <host>', 'Host to bind to')
     .option('--verbose', 'Enable verbose logging')
     .action(async (options) => {
-      await ensureSqlite();
+      // Only try to load/rebuild the SQLite native addon when no external
+      // database URL is configured (env may already be loaded via .env).
+      if (!process.env.ROTIFEX_DATABASE_URL) {
+        await ensureSqlite();
+      }
 
       console.log(`
   ██████╗  ██████╗ ████████╗██╗███████╗███████╗██╗  ██╗

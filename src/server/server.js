@@ -66,21 +66,21 @@ export async function createServer(config) {
 
   // ── Database + Auth (auth routes registered before engine so /auth/* ─
   // ── is a concrete path and always wins over parametric /api/:table)  ─
-  const db = getDatabase();
+  const db = await getDatabase({ databaseUrl: config.databaseUrl });
   await app.register(setupRoutes, { db });
   await app.register(authRoutes, { db });
 
   // ── Dynamic REST Engine ─────────────────────────────────────────────
-  bootstrapEngine(app, db);
+  await bootstrapEngine(app, db);
 
   // Ensure password_hash column exists on the users table now that it's created.
-  ensureAuthSchema(db);
+  await ensureAuthSchema(db);
   // Ensure the refresh token blacklist table exists.
-  ensureTokenBlacklist(db);
+  await ensureTokenBlacklist(db);
 
   // ── File Storage ────────────────────────────────────────────────────
   const storage = new StorageManager(db, config.storage);
-  storage.init();
+  await storage.init();
   await app.register(fileRoutes, { storage, config });
 
   // ── AI Routes ───────────────────────────────────────────────────────

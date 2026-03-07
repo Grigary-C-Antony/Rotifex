@@ -15,9 +15,9 @@ import { registerUser, validateRegistrationInput, ensureAuthSchema } from '../..
  */
 export async function setupRoutes(app, { db }) {
 
-  function adminExists() {
+  async function adminExists() {
     try {
-      const row = db.get("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+      const row = await db.get("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
       return !!row;
     } catch {
       return false;
@@ -25,16 +25,16 @@ export async function setupRoutes(app, { db }) {
   }
 
   // ── GET /setup/status ─────────────────────────────────────────────
-  app.get('/setup/status', () => {
-    return { needsSetup: !adminExists() };
+  app.get('/setup/status', async () => {
+    return { needsSetup: !(await adminExists()) };
   });
 
   // ── POST /setup ───────────────────────────────────────────────────
   app.post('/setup', async (request, reply) => {
     // Ensure the users table has the password_hash column before we write.
-    ensureAuthSchema(db);
+    await ensureAuthSchema(db);
 
-    if (adminExists()) {
+    if (await adminExists()) {
       return reply.status(409).send({
         error: 'Conflict',
         message: 'Setup has already been completed. Sign in with your admin account.',

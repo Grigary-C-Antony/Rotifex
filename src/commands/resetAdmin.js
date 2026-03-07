@@ -27,19 +27,19 @@ export function registerResetAdminCommand(program) {
       }
 
       try {
-        const db = getDatabase();
+        const db = await getDatabase();
 
-        const row = db.get("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'");
-        const count = row?.count ?? 0;
+        const row = await db.get("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'");
+        const count = Number(row?.count ?? 0);
 
         if (count === 0) {
           logger.info('No admin accounts found — nothing to remove.');
-          closeDatabase();
+          await closeDatabase();
           return;
         }
 
-        db.run("DELETE FROM users WHERE role = 'admin'");
-        closeDatabase();
+        await db.run("DELETE FROM users WHERE role = 'admin'");
+        await closeDatabase();
 
         logger.success(
           `Removed ${count} admin account${count !== 1 ? 's' : ''}. ` +
@@ -47,7 +47,7 @@ export function registerResetAdminCommand(program) {
         );
       } catch (err) {
         logger.error(`reset-admin failed: ${err.message}`);
-        closeDatabase();
+        await closeDatabase();
         process.exitCode = 1;
       }
     });

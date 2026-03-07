@@ -81,10 +81,11 @@ export function verifyRefreshToken(token) {
 /**
  * Ensure the `password_hash` column exists on the users table.
  * Managed outside the schema engine so it never appears in the model builder.
+ * @returns {Promise<void>}
  */
-export function ensureAuthSchema(db) {
+export async function ensureAuthSchema(db) {
   try {
-    db.run('ALTER TABLE users ADD COLUMN password_hash TEXT');
+    await db.run('ALTER TABLE users ADD COLUMN password_hash TEXT');
   } catch {
     // Column already exists — safe to ignore.
   }
@@ -92,27 +93,34 @@ export function ensureAuthSchema(db) {
 
 /**
  * Ensure the `_revoked_tokens` table exists for refresh token revocation.
+ * @returns {Promise<void>}
  */
-export function ensureTokenBlacklist(db) {
-  db.exec(`
+export async function ensureTokenBlacklist(db) {
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS _revoked_tokens (
-      jti        TEXT PRIMARY KEY,
-      expires_at TEXT NOT NULL
+      jti        VARCHAR(255) PRIMARY KEY,
+      expires_at VARCHAR(255) NOT NULL
     );
   `);
 }
 
-function revokeToken(db, jti, expiresAt) {
+async function revokeToken(db, jti, expiresAt) {
   try {
-    db.run('INSERT OR IGNORE INTO _revoked_tokens (jti, expires_at) VALUES (?, ?)', [jti, expiresAt]);
+    // Use a plain INSERT and ignore duplicate-key errors for cross-DB compat.
+    // (SQLite uses INSERT OR IGNORE; PostgreSQL/MySQL use ON CONFLICT DO NOTHING.
+    // A try/catch on a plain INSERT works for all dialects.)
+    await db.run(
+      'INSERT INTO _revoked_tokens (jti, expires_at) VALUES (?, ?)',
+      [jti, expiresAt],
+    );
   } catch {
-    // ignore
+    // Duplicate jti — already revoked, safe to ignore.
   }
 }
 
-function isTokenRevoked(db, jti) {
+async function isTokenRevoked(db, jti) {
   if (!jti) return false;
-  const row = db.get('SELECT jti FROM _revoked_tokens WHERE jti = ?', [jti]);
+  const row = await db.get('SELECT jti FROM _revoked_tokens WHERE jti = ?', [jti]);
   return !!row;
 }
 
@@ -140,7 +148,7 @@ export function validateRegistrationInput({ email, password }) {
 // ── Business logic ────────────────────────────────────────────────────────────
 
 export async function registerUser(db, { email, password, display_name, role = 'user' }) {
-  const existing = db.get('SELECT id FROM users WHERE email = ?', [email]);
+  const existing = await db.get('SELECT id FROM users WHERE email = ?', [email]);
   if (existing) {
     const err = new Error('Email already in use');
     err.statusCode = 409;
@@ -151,7 +159,7 @@ export async function registerUser(db, { email, password, display_name, role = '
   const id  = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  db.run(
+  await db.run(
     `INSERT INTO users (id, email, display_name, role, password_hash, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [id, email, display_name || null, role, password_hash, now, now],
@@ -161,7 +169,7 @@ export async function registerUser(db, { email, password, display_name, role = '
 }
 
 export async function loginUser(db, { email, password }) {
-  const user = db.get('SELECT * FROM users WHERE email = ?', [email]);
+  const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
   if (!user) {
     const err = new Error('Invalid credentials');
     err.statusCode = 401;
@@ -192,7 +200,7 @@ export async function loginUser(db, { email, password }) {
   };
 }
 
-export function getCurrentUser(db, userId) {
+export async function getCurrentUser(db, userId) {
   return db.get(
     'SELECT id, email, display_name, role, created_at FROM users WHERE id = ?',
     [userId],
@@ -210,14 +218,14 @@ export async function refreshTokens(db, refreshToken) {
   }
 
   // Reject if this specific token has been revoked (logout / rotation).
-  if (payload.jti && isTokenRevoked(db, payload.jti)) {
+  if (payload.jti && await isTokenRevoked(db, payload.jti)) {
     const err = new Error('Refresh token has been revoked');
     err.statusCode = 401;
     throw err;
   }
 
   // Re-fetch user so role changes are reflected in the new access token.
-  const user = db.get('SELECT id, role FROM users WHERE id = ?', [payload.userId]);
+  const user = await db.get('SELECT id, role FROM users WHERE id = ?', [payload.userId]);
   if (!user) {
     const err = new Error('User not found');
     err.statusCode = 401;
@@ -226,7 +234,7 @@ export async function refreshTokens(db, refreshToken) {
 
   // Revoke the consumed refresh token (token rotation — each token is one-use).
   if (payload.jti) {
-    revokeToken(db, payload.jti, new Date(payload.exp * 1000).toISOString());
+    await revokeToken(db, payload.jti, new Date(payload.exp * 1000).toISOString());
   }
 
   const newAccessToken  = signAccessToken({ userId: user.id, role: user.role });
@@ -240,7 +248,7 @@ export async function logout(db, refreshToken) {
   try {
     const payload = verifyRefreshToken(refreshToken);
     if (payload.jti) {
-      revokeToken(db, payload.jti, new Date(payload.exp * 1000).toISOString());
+      await revokeToken(db, payload.jti, new Date(payload.exp * 1000).toISOString());
     }
   } catch {
     // Token already invalid/expired — nothing to revoke, treat as success.
@@ -248,7 +256,7 @@ export async function logout(db, refreshToken) {
 }
 
 export async function changePassword(db, userId, { currentPassword, newPassword }) {
-  const user = db.get('SELECT * FROM users WHERE id = ?', [userId]);
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
   if (!user) {
     const err = new Error('User not found');
     err.statusCode = 404;
@@ -286,5 +294,5 @@ export async function changePassword(db, userId, { currentPassword, newPassword 
 
   const password_hash = await hashPassword(newPassword);
   const now = new Date().toISOString();
-  db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [password_hash, now, userId]);
+  await db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [password_hash, now, userId]);
 }

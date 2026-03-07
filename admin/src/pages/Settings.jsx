@@ -92,6 +92,21 @@ const SECTIONS = [
       },
     ],
   },
+  {
+    title: 'Database',
+    icon: '◧',
+    desc: 'External SQL database connection string. Leave blank to use the default SQLite database. Supported: PostgreSQL, MySQL, MariaDB. Restart required.',
+    vars: [
+      {
+        key:         'ROTIFEX_DATABASE_URL',
+        label:       'Connection String',
+        secret:      true,
+        desc:        'Full database URL. Empty = use local SQLite (default). Requires the matching driver: pg (PostgreSQL), mysql2 (MySQL/MariaDB).',
+        placeholder: 'postgresql://user:pass@host:5432/dbname',
+        example:     'postgresql://user:pass@localhost:5432/mydb',
+      },
+    ],
+  },
 ];
 
 // ── Token Timing ─────────────────────────────────────────────────────────────

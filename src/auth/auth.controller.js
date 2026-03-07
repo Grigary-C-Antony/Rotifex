@@ -152,7 +152,7 @@ export function makeAuthController(db) {
         });
       }
 
-      const user = getCurrentUser(db, payload.userId);
+      const user = await getCurrentUser(db, payload.userId);
       if (!user) {
         return reply.status(404).send({
           error: 'Not Found',

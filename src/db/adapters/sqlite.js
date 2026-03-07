@@ -4,12 +4,18 @@ import { DatabaseAdapter } from './base.js';
 /**
  * SQLite adapter backed by better-sqlite3.
  *
- * All operations are synchronous (better-sqlite3's design) which keeps
- * the API simple and avoids callback/promise complexity for a local CLI tool.
+ * better-sqlite3 is synchronous internally; every adapter method wraps the
+ * result in a resolved Promise so callers can `await` uniformly across all
+ * adapter implementations (SQLite, PostgreSQL, MySQL, …).
+ *
+ * Transactions use explicit BEGIN / COMMIT / ROLLBACK so that async callbacks
+ * (e.g. user migration files that await other db calls) are handled correctly.
  */
 export class SqliteAdapter extends DatabaseAdapter {
   /** @type {import('better-sqlite3').Database|null} */
   #db = null;
+
+  get dialect() { return 'sqlite'; }
 
   /**
    * @param {string} filepath  Path to the SQLite database file.
@@ -24,16 +30,14 @@ export class SqliteAdapter extends DatabaseAdapter {
   /*  Connection lifecycle                                               */
   /* ------------------------------------------------------------------ */
 
-  /** @inheritdoc */
-  open() {
+  async open() {
     if (this.#db) return;
     this.#db = new Database(this.filepath);
     // Enable WAL mode for better concurrent-read performance.
     this.#db.pragma('journal_mode = WAL');
   }
 
-  /** @inheritdoc */
-  close() {
+  async close() {
     if (!this.#db) return;
     this.#db.close();
     this.#db = null;
@@ -43,35 +47,51 @@ export class SqliteAdapter extends DatabaseAdapter {
   /*  Query helpers                                                      */
   /* ------------------------------------------------------------------ */
 
-  /** @inheritdoc */
-  run(sql, params = []) {
+  async run(sql, params = []) {
     this.#ensureOpen();
-    return this.#db.prepare(sql).run(...params);
+    const info = this.#db.prepare(sql).run(...params);
+    return { changes: info.changes };
   }
 
-  /** @inheritdoc */
-  get(sql, params = []) {
+  async get(sql, params = []) {
     this.#ensureOpen();
     return this.#db.prepare(sql).get(...params);
   }
 
-  /** @inheritdoc */
-  all(sql, params = []) {
+  async all(sql, params = []) {
     this.#ensureOpen();
     return this.#db.prepare(sql).all(...params);
   }
 
-  /** @inheritdoc */
-  exec(sql) {
+  async exec(sql) {
     this.#ensureOpen();
     this.#db.exec(sql);
   }
 
-  /** @inheritdoc */
-  transaction(fn) {
+  /**
+   * Run `fn` inside a transaction.
+   *
+   * Uses explicit BEGIN / COMMIT / ROLLBACK rather than better-sqlite3's
+   * synchronous transaction() wrapper so that async callbacks are handled
+   * correctly (e.g. user migration files that await db calls).
+   */
+  async transaction(fn) {
     this.#ensureOpen();
-    const wrapped = this.#db.transaction(() => fn(this));
-    return wrapped();
+    this.#db.exec('BEGIN');
+    try {
+      const result = await fn(this);
+      this.#db.exec('COMMIT');
+      return result;
+    } catch (e) {
+      this.#db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+
+  async getColumns(tableName) {
+    this.#ensureOpen();
+    const rows = this.#db.prepare(`PRAGMA table_info(${tableName})`).all();
+    return rows.map(r => r.name);
   }
 
   /* ------------------------------------------------------------------ */

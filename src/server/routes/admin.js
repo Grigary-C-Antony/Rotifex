@@ -69,33 +69,33 @@ export async function adminRoutes(app, { db }) {
   });
 
   // ── GET /admin/api/stats ──────────────────────────────────────────
-  app.get('/admin/api/stats', () => {
+  app.get('/admin/api/stats', async () => {
     const models = loadSchema();
     const modelStats = [];
 
     for (const [name, model] of models) {
-      const row = db.get(`SELECT COUNT(*) AS count FROM ${model.tableName}`);
+      const row = await db.get(`SELECT COUNT(*) AS count FROM ${model.tableName}`);
       modelStats.push({
         model: name,
         table: model.tableName,
-        count: row?.count ?? 0,
+        count: Number(row?.count ?? 0),
       });
     }
 
     // User stats
     let userCount = 0;
     try {
-      const userRow = db.get('SELECT COUNT(*) AS count FROM users');
-      userCount = userRow?.count ?? 0;
+      const userRow = await db.get('SELECT COUNT(*) AS count FROM users');
+      userCount = Number(userRow?.count ?? 0);
     } catch {}
 
     // File stats
     let fileCount = 0;
     let storageBytes = 0;
     try {
-      const fileRow = db.get('SELECT COUNT(*) AS count, COALESCE(SUM(size_bytes), 0) AS total FROM _files');
-      fileCount = fileRow?.count ?? 0;
-      storageBytes = fileRow?.total ?? 0;
+      const fileRow = await db.get('SELECT COUNT(*) AS count, COALESCE(SUM(size_bytes), 0) AS total FROM _files');
+      fileCount    = Number(fileRow?.count ?? 0);
+      storageBytes = Number(fileRow?.total ?? 0);
     } catch {
       // _files table may not exist yet
     }
@@ -142,7 +142,7 @@ export async function adminRoutes(app, { db }) {
   const SYSTEM_MODELS = new Set(['User']);
 
   // ── POST /admin/api/schema — create or replace a model ───────────
-  app.post('/admin/api/schema', (request, reply) => {
+  app.post('/admin/api/schema', async (request, reply) => {
     const { name, fields } = request.body || {};
     if (!name || !fields || typeof fields !== 'object') {
       return reply.status(400).send({
@@ -182,7 +182,7 @@ export async function adminRoutes(app, { db }) {
     const modelDef = parseModelDef(name, { fields });
 
     // 3. Create DB table if it doesn't exist yet (idempotent)
-    syncTables(db, new Map([[name, modelDef]]));
+    await syncTables(db, new Map([[name, modelDef]]));
 
     // 4. Add to live store — routes are active immediately
     upsertModel(name, modelDef);
@@ -262,14 +262,14 @@ export async function adminRoutes(app, { db }) {
       });
     }
 
-    const user = db.get('SELECT id FROM users WHERE id = ?', [id]);
+    const user = await db.get('SELECT id FROM users WHERE id = ?', [id]);
     if (!user) {
       return reply.status(404).send({ error: 'Not Found', message: 'User not found', statusCode: 404 });
     }
 
     const password_hash = await hashPassword(password);
     const now = new Date().toISOString();
-    db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [password_hash, now, id]);
+    await db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [password_hash, now, id]);
 
     return reply.status(204).send();
   });
@@ -323,4 +323,5 @@ const ENV_KEYS = [
   'ROTIFEX_LOG_LEVEL',
   'ROTIFEX_STORAGE_MAX_FILE_SIZE_MB',
   'ROTIFEX_STORAGE_SIGNED_URL_SECRET',
+  'ROTIFEX_DATABASE_URL',
 ];

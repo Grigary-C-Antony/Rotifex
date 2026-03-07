@@ -71,7 +71,7 @@ export async function fileRoutes(app, { storage, config }) {
       });
     }
 
-    const fileMeta = storage.save(
+    const fileMeta = await storage.save(
       { filename: data.filename, mimetype: data.mimetype, data: buffer },
       { visibility, uploaderId: identity.userId },
     );
@@ -80,20 +80,20 @@ export async function fileRoutes(app, { storage, config }) {
   });
 
   // ── LIST FILES ────────────────────────────────────────────────────
-  app.get('/files', (request, reply) => {
+  app.get('/files', async (request, reply) => {
     const identity = getIdentity(request);
     const filters = identity.role === 'admin'
       ? {}
       : { uploaderId: identity.userId };
 
-    const files = storage.listFiles(filters);
+    const files = await storage.listFiles(filters);
     return { data: files, meta: { total: files.length } };
   });
 
   // ── GET FILE METADATA ─────────────────────────────────────────────
-  app.get('/files/:id', (request, reply) => {
+  app.get('/files/:id', async (request, reply) => {
     const identity = getIdentity(request);
-    const meta = storage.getFileMeta(request.params.id);
+    const meta = await storage.getFileMeta(request.params.id);
     if (!meta) {
       return reply.status(404).send({
         error: 'Not Found',
@@ -107,8 +107,8 @@ export async function fileRoutes(app, { storage, config }) {
   });
 
   // ── DOWNLOAD ──────────────────────────────────────────────────────
-  app.get('/files/:id/download', (request, reply) => {
-    const meta = storage.getFileMeta(request.params.id);
+  app.get('/files/:id/download', async (request, reply) => {
+    const meta = await storage.getFileMeta(request.params.id);
     if (!meta) {
       return reply.status(404).send({
         error: 'Not Found',
@@ -143,9 +143,9 @@ export async function fileRoutes(app, { storage, config }) {
   });
 
   // ── GENERATE SIGNED URL ───────────────────────────────────────────
-  app.get('/files/:id/signed-url', (request, reply) => {
+  app.get('/files/:id/signed-url', async (request, reply) => {
     const identity = getIdentity(request);
-    const meta = storage.getFileMeta(request.params.id);
+    const meta = await storage.getFileMeta(request.params.id);
     if (!meta) {
       return reply.status(404).send({
         error: 'Not Found',
@@ -169,9 +169,9 @@ export async function fileRoutes(app, { storage, config }) {
   });
 
   // ── DELETE ────────────────────────────────────────────────────────
-  app.delete('/files/:id', (request, reply) => {
+  app.delete('/files/:id', async (request, reply) => {
     const identity = getIdentity(request);
-    const meta = storage.getFileMeta(request.params.id);
+    const meta = await storage.getFileMeta(request.params.id);
     if (!meta) {
       return reply.status(404).send({
         error: 'Not Found',
@@ -182,7 +182,7 @@ export async function fileRoutes(app, { storage, config }) {
 
     if (!assertAccess(meta, identity, reply)) return;
 
-    storage.deleteFile(meta.id);
+    await storage.deleteFile(meta.id);
     return reply.status(204).send();
   });
 }

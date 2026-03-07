@@ -53,14 +53,15 @@ function ensureSystemModels(schemaPath) {
  * @param {import('fastify').FastifyInstance} app
  * @param {import('../db/adapters/base.js').DatabaseAdapter} db
  * @param {string} [schemaPath]
+ * @returns {Promise<void>}
  */
-export function bootstrapEngine(app, db, schemaPath = 'schema.json') {
+export async function bootstrapEngine(app, db, schemaPath = 'schema.json') {
   ensureSystemModels(schemaPath);
 
   const models = loadSchema(schemaPath);
 
   initStore(models);
-  syncTables(db, models);
+  await syncTables(db, models);
   registerGenericRoutes(app, db);
 
   logger.success(

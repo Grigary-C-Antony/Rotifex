@@ -15,25 +15,6 @@
       }
     }
   },
-  "products": {
-    "fields": {
-      "name": {
-        "type": "string",
-        "required": false,
-        "unique": false
-      },
-      "sku": {
-        "type": "string",
-        "required": false,
-        "unique": false
-      },
-      "description": {
-        "type": "string",
-        "required": false,
-        "unique": false
-      }
-    }
-  },
   "Product": {
     "fields": {
       "name": "string",

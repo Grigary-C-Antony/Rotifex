@@ -16,8 +16,9 @@ export function registerMigrateCommand(program) {
     .option('--rollback', 'Roll back the last batch of migrations')
     .action(async (options) => {
       try {
-        const db = getDatabase();
+        const db = await getDatabase();
         const migrator = new Migrator(db);
+        await migrator.init();
 
         if (options.rollback) {
           logger.warn('Rolling back last migration batch…');
@@ -28,7 +29,7 @@ export function registerMigrateCommand(program) {
             rolled.forEach(f => logger.info(`  ↩ ${f}`));
             logger.success(`Rolled back ${rolled.length} migration(s).`);
           }
-          closeDatabase();
+          await closeDatabase();
           return;
         }
 
@@ -36,14 +37,14 @@ export function registerMigrateCommand(program) {
 
         if (pending.length === 0) {
           logger.success('No pending migrations.');
-          closeDatabase();
+          await closeDatabase();
           return;
         }
 
         if (options.dryRun) {
           logger.info('Dry-run mode — the following migrations would be applied:');
           pending.forEach(f => logger.info(`  ▸ ${f}`));
-          closeDatabase();
+          await closeDatabase();
           return;
         }
 
@@ -52,10 +53,10 @@ export function registerMigrateCommand(program) {
         applied.forEach(f => logger.info(`  ✔ ${f}`));
         logger.success(`Applied ${applied.length} migration(s).`);
 
-        closeDatabase();
+        await closeDatabase();
       } catch (err) {
         logger.error(`Migration failed: ${err.message}`);
-        closeDatabase();
+        await closeDatabase();
         process.exitCode = 1;
       }
     });

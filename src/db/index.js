@@ -10,3 +10,4 @@ export { createTable, dropTable } from './schema.js';
 export { Migrator } from './migrator.js';
 export { DatabaseAdapter } from './adapters/base.js';
 export { SqliteAdapter } from './adapters/sqlite.js';
+export { SequelizeAdapter } from './adapters/sequelize.js';

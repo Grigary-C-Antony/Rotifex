@@ -9,11 +9,11 @@ import { createTable } from '../db/index.js';
  *
  * @param {import('../db/adapters/base.js').DatabaseAdapter} db
  * @param {Map<string, { tableName: string, fields: object[] }>} models
+ * @returns {Promise<void>}
  */
-export function syncTables(db, models) {
+export async function syncTables(db, models) {
   for (const [, model] of models) {
     const columns = model.fields.map(f => {
-      const parts = [f.name, f.sqlType];
       const constraints = [];
       if (f.required) constraints.push('NOT NULL');
       if (f.unique)   constraints.push('UNIQUE');
@@ -21,12 +21,11 @@ export function syncTables(db, models) {
         const val = typeof f.default === 'string' ? `'${f.default}'` : f.default;
         constraints.push(`DEFAULT ${val}`);
       }
-      if (constraints.length) parts.push(constraints.join(' '));
-      return { name: parts[0], type: parts[1], constraints: constraints.join(' ') || undefined };
+      return { name: f.name, type: f.sqlType, constraints: constraints.join(' ') || undefined };
     });
 
-    createTable(db, model.tableName, columns);
-    addMissingColumns(db, model.tableName, model.fields);
+    await createTable(db, model.tableName, columns);
+    await addMissingColumns(db, model.tableName, model.fields);
   }
 }
 
@@ -34,14 +33,22 @@ export function syncTables(db, models) {
  * For an already-existing table, ALTER TABLE to add any columns that are in
  * the schema definition but not yet in the DB.
  *
- * SQLite does not allow adding NOT NULL columns without a DEFAULT to existing
- * tables (existing rows would violate the constraint), so we omit NOT NULL
- * for added columns. The application layer handles required-field validation.
+ * NOT NULL is omitted for added columns because existing rows would violate
+ * the constraint.  The application layer handles required-field validation.
+ *
+ * @param {import('../db/adapters/base.js').DatabaseAdapter} db
+ * @param {string} tableName
+ * @param {object[]} fields
+ * @returns {Promise<void>}
  */
-function addMissingColumns(db, tableName, fields) {
-  const existing = new Set(
-    db.all(`PRAGMA table_info(${tableName})`).map(r => r.name),
-  );
+async function addMissingColumns(db, tableName, fields) {
+  let existing;
+  try {
+    existing = new Set(await db.getColumns(tableName));
+  } catch {
+    // Table may not exist yet — createTable above will handle it.
+    return;
+  }
 
   for (const f of fields) {
     if (existing.has(f.name)) continue;
@@ -53,7 +60,7 @@ function addMissingColumns(db, tableName, fields) {
     }
 
     try {
-      db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${colDef}`);
+      await db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${colDef}`);
     } catch {
       // Column added by a concurrent call — safe to ignore.
     }
