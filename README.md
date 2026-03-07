@@ -2,7 +2,7 @@
 
 # Rotifex
 
-> open the documentaion at [Docs](https://rotifex-docs.vercel.app/)
+> Rotifex is a self-hosted backend platform that instantly generates APIs, authentication, storage, and AI features from a simple schema for more open the documentaion at [Docs](https://rotifex-docs.vercel.app/)
 
 ---
 
@@ -32,11 +32,11 @@ npx rotifex start
 
 ### `start` flags
 
-| Flag              | Description                                                          |
-| ----------------- | -------------------------------------------------------------------- |
-| `-p, --port <n>`  | TCP port to listen on (overrides `ROTIFEX_PORT` and auto-fallback)  |
-| `--host <host>`   | Bind address (overrides `ROTIFEX_HOST`)                             |
-| `--verbose`       | Enable debug-level logging                                          |
+| Flag             | Description                                                        |
+| ---------------- | ------------------------------------------------------------------ |
+| `-p, --port <n>` | TCP port to listen on (overrides `ROTIFEX_PORT` and auto-fallback) |
+| `--host <host>`  | Bind address (overrides `ROTIFEX_HOST`)                            |
+| `--verbose`      | Enable debug-level logging                                         |
 
 **Port auto-fallback:** If no port is explicitly set, Rotifex tries port `4994`, then `4995`, then `4996`. If all three are occupied it exits with a clear error. Pass `--port` or set `ROTIFEX_PORT` to pin a specific port and skip the fallback.
 
@@ -414,10 +414,10 @@ Exchange a refresh token for a new token pair. The consumed refresh token is imm
 
 **Errors:**
 
-| Code  | Reason                                       |
-| ----- | -------------------------------------------- |
-| `400` | Missing refreshToken                         |
-| `401` | Invalid, expired, or already-revoked token   |
+| Code  | Reason                                     |
+| ----- | ------------------------------------------ |
+| `400` | Missing refreshToken                       |
+| `401` | Invalid, expired, or already-revoked token |
 
 ---
 
@@ -439,9 +439,9 @@ Revoke a refresh token. After this call the token cannot be used to issue new pa
 
 **Errors:**
 
-| Code  | Reason                           |
-| ----- | -------------------------------- |
-| `400` | Missing or invalid refreshToken  |
+| Code  | Reason                          |
+| ----- | ------------------------------- |
+| `400` | Missing or invalid refreshToken |
 
 ---
 
@@ -1355,10 +1355,10 @@ Client                          Rotifex Server
 
 ### Token Details
 
-| Token         | Algorithm | Default TTL | TTL Env Var                   | Secret Env Var       |
-| ------------- | --------- | ----------- | ----------------------------- | -------------------- |
-| Access Token  | HS256     | 60 min      | `ROTIFEX_ACCESS_TOKEN_TTL`    | `JWT_SECRET`         |
-| Refresh Token | HS256     | 30 days     | `ROTIFEX_REFRESH_TOKEN_TTL`   | `JWT_REFRESH_SECRET` |
+| Token         | Algorithm | Default TTL | TTL Env Var                 | Secret Env Var       |
+| ------------- | --------- | ----------- | --------------------------- | -------------------- |
+| Access Token  | HS256     | 60 min      | `ROTIFEX_ACCESS_TOKEN_TTL`  | `JWT_SECRET`         |
+| Refresh Token | HS256     | 30 days     | `ROTIFEX_REFRESH_TOKEN_TTL` | `JWT_REFRESH_SECRET` |
 
 TTLs are in **minutes**. The refresh TTL must be ≥ 2× the access TTL and ≥ 120 minutes. Both can be tuned in the admin **Settings** page or via `.env`.
 
@@ -1678,19 +1678,19 @@ Signed URLs are generated via `GET /files/:id/signed-url`. The default TTL is 1 
 
 Editable via admin panel — writes to `.env`:
 
-| Variable                            | Description                                                     |
-| ----------------------------------- | --------------------------------------------------------------- |
-| `ROTIFEX_ACCESS_TOKEN_TTL`          | Access token lifetime in minutes (min 5, default 60)           |
+| Variable                            | Description                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------- |
+| `ROTIFEX_ACCESS_TOKEN_TTL`          | Access token lifetime in minutes (min 5, default 60)                      |
 | `ROTIFEX_REFRESH_TOKEN_TTL`         | Refresh token lifetime in minutes (min 120 and ≥ 2×access, default 43200) |
-| `JWT_SECRET`                        | Access token signing secret                                     |
-| `JWT_REFRESH_SECRET`                | Refresh token signing secret                                    |
-| `ROTIFEX_PORT`                      | Server port                                                     |
-| `ROTIFEX_HOST`                      | Server bind host                                                |
-| `ROTIFEX_CORS_ORIGIN`               | Allowed CORS origin(s)                                          |
-| `ROTIFEX_RATE_LIMIT_MAX`            | Max requests per time window                                    |
-| `ROTIFEX_LOG_LEVEL`                 | Log verbosity                                                   |
-| `ROTIFEX_STORAGE_MAX_FILE_SIZE_MB`  | Max upload size in MB                                           |
-| `ROTIFEX_STORAGE_SIGNED_URL_SECRET` | HMAC secret for signed URLs                                     |
+| `JWT_SECRET`                        | Access token signing secret                                               |
+| `JWT_REFRESH_SECRET`                | Refresh token signing secret                                              |
+| `ROTIFEX_PORT`                      | Server port                                                               |
+| `ROTIFEX_HOST`                      | Server bind host                                                          |
+| `ROTIFEX_CORS_ORIGIN`               | Allowed CORS origin(s)                                                    |
+| `ROTIFEX_RATE_LIMIT_MAX`            | Max requests per time window                                              |
+| `ROTIFEX_LOG_LEVEL`                 | Log verbosity                                                             |
+| `ROTIFEX_STORAGE_MAX_FILE_SIZE_MB`  | Max upload size in MB                                                     |
+| `ROTIFEX_STORAGE_SIGNED_URL_SECRET` | HMAC secret for signed URLs                                               |
 
 The **Token Timing** card validates constraints live: refresh TTL must be ≥ 2× access TTL and ≥ 120 minutes. The Save button is disabled until all errors are resolved.
 
@@ -1744,19 +1744,19 @@ Validation errors may return an array for `message`:
 
 ### Environment Variables Reference
 
-| Variable                            | Default   | Description                                                        |
-| ----------------------------------- | --------- | ------------------------------------------------------------------ |
-| `ROTIFEX_PORT`                      | `4994`    | TCP port (auto-tries 4994 → 4995 → 4996 if unset)                |
-| `ROTIFEX_HOST`                      | `0.0.0.0` | Bind address                                                       |
-| `ROTIFEX_CORS_ORIGIN`               | `*`       | Allowed CORS origin                                                |
-| `ROTIFEX_RATE_LIMIT_MAX`            | `100`     | Max requests per rate-limit window                                 |
-| `ROTIFEX_LOG_LEVEL`                 | `info`    | Log level (`info`, `debug`, `warn`, `error`)                      |
-| `ROTIFEX_STORAGE_MAX_FILE_SIZE_MB`  | `10`      | Max upload size in MB                                              |
-| `ROTIFEX_STORAGE_SIGNED_URL_SECRET` | auto      | HMAC secret for signed file URLs                                   |
-| `ROTIFEX_ACCESS_TOKEN_TTL`          | `60`      | Access token TTL in minutes (min 5)                               |
-| `ROTIFEX_REFRESH_TOKEN_TTL`         | `43200`   | Refresh token TTL in minutes (min 120, must be ≥ 2× access TTL)  |
-| `JWT_SECRET`                        | auto      | Access token signing secret                                        |
-| `JWT_REFRESH_SECRET`                | auto      | Refresh token signing secret                                       |
+| Variable                            | Default   | Description                                                     |
+| ----------------------------------- | --------- | --------------------------------------------------------------- |
+| `ROTIFEX_PORT`                      | `4994`    | TCP port (auto-tries 4994 → 4995 → 4996 if unset)               |
+| `ROTIFEX_HOST`                      | `0.0.0.0` | Bind address                                                    |
+| `ROTIFEX_CORS_ORIGIN`               | `*`       | Allowed CORS origin                                             |
+| `ROTIFEX_RATE_LIMIT_MAX`            | `100`     | Max requests per rate-limit window                              |
+| `ROTIFEX_LOG_LEVEL`                 | `info`    | Log level (`info`, `debug`, `warn`, `error`)                    |
+| `ROTIFEX_STORAGE_MAX_FILE_SIZE_MB`  | `10`      | Max upload size in MB                                           |
+| `ROTIFEX_STORAGE_SIGNED_URL_SECRET` | auto      | HMAC secret for signed file URLs                                |
+| `ROTIFEX_ACCESS_TOKEN_TTL`          | `60`      | Access token TTL in minutes (min 5)                             |
+| `ROTIFEX_REFRESH_TOKEN_TTL`         | `43200`   | Refresh token TTL in minutes (min 120, must be ≥ 2× access TTL) |
+| `JWT_SECRET`                        | auto      | Access token signing secret                                     |
+| `JWT_REFRESH_SECRET`                | auto      | Refresh token signing secret                                    |
 
 > `JWT_SECRET`, `JWT_REFRESH_SECRET`, and `ROTIFEX_STORAGE_SIGNED_URL_SECRET` are auto-generated on first startup if absent and saved to `.env`.
 
