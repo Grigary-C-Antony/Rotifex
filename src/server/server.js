@@ -9,6 +9,7 @@ import { registerErrorHandler } from './middleware/errorHandler.js';
 import { healthRoutes } from './routes/health.js';
 import { fileRoutes } from './routes/files.js';
 import { adminRoutes } from './routes/admin.js';
+import { setupRoutes } from './routes/setup.js';
 import { authRoutes } from '../auth/auth.routes.js';
 import { ensureAuthSchema, ensureTokenBlacklist } from '../auth/auth.service.js';
 import { aiRoutes } from '../ai/ai.routes.js';
@@ -66,6 +67,7 @@ export async function createServer(config) {
   // ── Database + Auth (auth routes registered before engine so /auth/* ─
   // ── is a concrete path and always wins over parametric /api/:table)  ─
   const db = getDatabase();
+  await app.register(setupRoutes, { db });
   await app.register(authRoutes, { db });
 
   // ── Dynamic REST Engine ─────────────────────────────────────────────

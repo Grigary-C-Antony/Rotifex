@@ -16,8 +16,14 @@ import { verifyAccessToken } from './auth.service.js';
  */
 export function registerJwtMiddleware(app) {
   app.addHook('onRequest', async (request, reply) => {
-    // Public auth endpoints — never require a token.
+    // Always strip client-supplied identity headers so they can never be forged.
+    // They are only set below, from a verified JWT payload.
+    delete request.headers['x-user-id'];
+    delete request.headers['x-user-role'];
+
+    // Public endpoints — never require a token.
     if (request.url.startsWith('/auth/')) return;
+    if (request.url.startsWith('/setup')) return;
 
     const header = request.headers['authorization'] ?? '';
     if (!header.startsWith('Bearer ')) return; // no token → pass through

@@ -9,7 +9,7 @@ export function makeAuthController(db) {
   return {
 
     async register(request, reply) {
-      const { email, password, display_name, role } = request.body ?? {};
+      const { email, password, display_name } = request.body ?? {};
 
       // Input validation
       const errors = validateRegistrationInput({ email: email ?? '', password: password ?? '' });
@@ -22,7 +22,8 @@ export function makeAuthController(db) {
       }
 
       try {
-        const user = await registerUser(db, { email, password, display_name, role });
+        // role is always 'user' — admins are created only through /setup or the admin panel
+        const user = await registerUser(db, { email, password, display_name, role: 'user' });
         return reply.status(201).send({ data: user, message: 'User registered successfully' });
       } catch (e) {
         return reply.status(e.statusCode ?? 500).send({

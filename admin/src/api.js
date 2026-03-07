@@ -57,9 +57,13 @@ async function request(path, options = {}, _isRetry = false) {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export const api = {
+  // First-run setup
+  setupStatus: ()                                   => request('/setup/status'),
+  setup:       (email, password, display_name)      => request('/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, display_name }) }),
+
   // Auth
   login:          (email, password)                     => request('/auth/login',           { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }),
-  register:       (email, password, display_name, role) => request('/auth/register',        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, display_name, role }) }),
+  register:       (email, password, display_name)       => request('/auth/register',        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, display_name }) }),
   logout:         ()                                    => request('/auth/logout',          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: getRefreshToken() }) }),
   changePassword: (currentPassword, newPassword)        => request('/auth/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword, newPassword }) }),
   getMe:          ()                                    => request('/auth/me'),

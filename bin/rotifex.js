@@ -4,6 +4,7 @@ import { program } from 'commander';
 import { registerInitCommand } from '../src/commands/init.js';
 import { registerStartCommand } from '../src/commands/start.js';
 import { registerMigrateCommand } from '../src/commands/migrate.js';
+import { registerResetAdminCommand } from '../src/commands/resetAdmin.js';
 
 program
   .name('rotifex')
@@ -14,5 +15,6 @@ program
 registerInitCommand(program);
 registerStartCommand(program);
 registerMigrateCommand(program);
+registerResetAdminCommand(program);
 
 program.parse(process.argv);

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { isAuthenticated, getUser, clearTokens } from "./auth";
 import { api } from "./api";
 import Login from "./pages/Login";
+import Setup from "./pages/Setup";
 import Dashboard from "./pages/Dashboard";
 import Models from "./pages/Models";
 import Users from "./pages/Users";
@@ -40,10 +41,19 @@ export default function App() {
   const [authed, setAuthed] = useState(isAuthenticated);
   const [user, setUser] = useState(getUser);
   const [page, setPage] = useState("dashboard");
+  const [needsSetup, setNeedsSetup] = useState(false);
+
+  useEffect(() => {
+    if (authed) return; // already logged in, no need to check
+    api.setupStatus()
+      .then(res => setNeedsSetup(res?.needsSetup === true))
+      .catch(() => {}); // if the check fails, fall through to login
+  }, [authed]);
 
   const handleLogin = (u) => {
     setUser(u);
     setAuthed(true);
+    setNeedsSetup(false);
   };
 
   const handleLogout = async () => {
@@ -54,6 +64,7 @@ export default function App() {
     setPage("dashboard");
   };
 
+  if (!authed && needsSetup) return <Setup onSetupComplete={handleLogin} />;
   if (!authed) return <Login onLogin={handleLogin} />;
 
   const renderPage = () => {
