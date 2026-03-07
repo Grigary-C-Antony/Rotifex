@@ -1,6 +1,6 @@
 {
   "name": "rotifex",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Rotifex — a modern CLI toolkit for project scaffolding, development, and migrations.",
   "type": "module",
   "bin": {
