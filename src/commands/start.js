@@ -1,7 +1,38 @@
 import { execSync, spawnSync } from 'node:child_process';
+import { createServer as createNetServer } from 'node:net';
 import { logger } from '../lib/logger.js';
 import { loadConfig } from '../lib/config.js';
 import { createServer } from '../server/index.js';
+
+/**
+ * Check whether a TCP port is available on the given host.
+ * Resolves true if the port can be bound, false if it's already in use.
+ */
+function isPortAvailable(port, host) {
+  return new Promise((resolve) => {
+    const probe = createNetServer();
+    probe.once('error', () => resolve(false));
+    probe.once('listening', () => { probe.close(); resolve(true); });
+    probe.listen(port, host);
+  });
+}
+
+/**
+ * Starting from `basePort`, find the first available port within `maxTries`.
+ * Logs a warning for each skipped port.
+ * Throws if no port is found within the range.
+ */
+async function findAvailablePort(basePort, host, maxTries = 3) {
+  for (let i = 0; i < maxTries; i++) {
+    const port = basePort + i;
+    if (await isPortAvailable(port, host)) return port;
+    logger.warn(`Port ${port} is already in use${i < maxTries - 1 ? `, trying ${port + 1}…` : '.'}`);
+  }
+  throw new Error(
+    `All ports ${basePort}–${basePort + maxTries - 1} are in use. ` +
+    `Free one up or set a custom port with --port or ROTIFEX_PORT.`,
+  );
+}
 
 /**
  * Try to load better-sqlite3. If the native addon is stale or compiled for
@@ -65,6 +96,15 @@ export function registerStartCommand(program) {
         if (options.verbose) cliOverrides.logging = { level: 'debug' };
 
         const config = loadConfig({ cliOverrides });
+
+        // ── Port resolution ───────────────────────────────────────────
+        // If the user explicitly set a port (--port flag or ROTIFEX_PORT env var)
+        // respect it exactly and let Fastify fail naturally if it's taken.
+        // Otherwise try the base port then fall through 4994 → 4995 → 4996.
+        const portExplicit = !!options.port || !!process.env.ROTIFEX_PORT;
+        if (!portExplicit) {
+          config.server.port = await findAvailablePort(config.server.port, config.server.host);
+        }
 
         // ── Create & start server ─────────────────────────────────────
         const app = await createServer(config);

@@ -16,8 +16,10 @@ import { makeAuthController } from './auth.controller.js';
 export async function authRoutes(app, { db }) {
   const ctrl = makeAuthController(db);
 
-  app.post('/auth/register', (req, reply) => ctrl.register(req, reply));
-  app.post('/auth/login',    (req, reply) => ctrl.login(req, reply));
-  app.post('/auth/refresh',  (req, reply) => ctrl.refresh(req, reply));
-  app.get('/auth/me',        (req, reply) => ctrl.me(req, reply));
+  app.post('/auth/register',         (req, reply) => ctrl.register(req, reply));
+  app.post('/auth/login',            (req, reply) => ctrl.login(req, reply));
+  app.post('/auth/refresh',          (req, reply) => ctrl.refresh(req, reply));
+  app.post('/auth/logout',           (req, reply) => ctrl.logout(req, reply));
+  app.post('/auth/change-password',  (req, reply) => ctrl.changePassword(req, reply));
+  app.get('/auth/me',                (req, reply) => ctrl.me(req, reply));
 }

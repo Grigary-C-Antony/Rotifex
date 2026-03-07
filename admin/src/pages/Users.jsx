@@ -109,6 +109,55 @@ const AUTH_ENDPOINTS = [
     ],
     exampleBody: null,
   },
+  {
+    method:  'POST',
+    path:    '/auth/change-password',
+    desc:    'Change the password of the currently authenticated user. Requires a valid access token.',
+    auth:    true,
+    request: {
+      body: {
+        currentPassword: { type: 'string', required: true, desc: 'The user\'s current password' },
+        newPassword:     { type: 'string', required: true, desc: 'New password — min 8 chars, at least 1 letter + 1 number' },
+      },
+    },
+    responses: [
+      {
+        status: 204,
+        desc:   'Password changed successfully (no body)',
+        body:   null,
+      },
+      {
+        status: 400,
+        desc:   'Weak or missing new password',
+        body:   { error: 'Password change failed', message: 'New password must be at least 8 characters', statusCode: 400 },
+      },
+      {
+        status: 401,
+        desc:   'Wrong current password or missing token',
+        body:   { error: 'Password change failed', message: 'Current password is incorrect', statusCode: 401 },
+      },
+    ],
+    exampleBody: { currentPassword: 'oldpass1', newPassword: 'newpass2' },
+  },
+  {
+    method:  'POST',
+    path:    '/auth/logout',
+    desc:    'Revoke the current refresh token. The access token expires naturally after 1 h.',
+    auth:    false,
+    request: {
+      body: {
+        refreshToken: { type: 'string', required: true, desc: 'The refresh token to invalidate' },
+      },
+    },
+    responses: [
+      {
+        status: 204,
+        desc:   'Logged out successfully (no body)',
+        body:   null,
+      },
+    ],
+    exampleBody: { refreshToken: '<your-refresh-token>' },
+  },
 ];
 
 function copy(text, setCopied) {
@@ -250,7 +299,10 @@ function AuthApiEndpoint({ ep }) {
                       </span>
                       <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.desc}</span>
                     </div>
-                    <pre className="endpoint-pre" style={{ fontSize: 11 }}>{JSON.stringify(r.body, null, 2)}</pre>
+                    {r.body !== null
+                      ? <pre className="endpoint-pre" style={{ fontSize: 11 }}>{JSON.stringify(r.body, null, 2)}</pre>
+                      : <pre className="endpoint-pre" style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>No response body</pre>
+                    }
                   </div>
                 ))}
               </div>
@@ -291,7 +343,8 @@ function AuthApiDocs() {
       <div className="card" style={{ padding: '14px 18px', borderLeft: '3px solid var(--primary)' }}>
         <p style={{ fontSize: 13, lineHeight: 1.7, margin: 0, color: 'var(--text-muted)' }}>
           All auth endpoints live under <code style={{ background: '#f3f4f6', padding: '1px 6px', borderRadius: 4, fontFamily: 'SF Mono, monospace', fontSize: 12 }}>/auth</code>.
-          Tokens expire in <strong>1 h</strong> (access) and <strong>30 d</strong> (refresh).
+          Access tokens expire based on the configured TTL (default <strong>1 h</strong>); refresh tokens expire based on their configured TTL (default <strong>30 d</strong>) and are <strong>single-use</strong> (rotated on each refresh). Both can be tuned in <strong>Settings → Token Timing</strong>.
+          Logging out via <code style={{ background: '#f3f4f6', padding: '1px 6px', borderRadius: 4, fontFamily: 'SF Mono, monospace', fontSize: 12 }}>/auth/logout</code> immediately revokes the refresh token.
           Passwords are hashed with <strong>bcrypt</strong> (12 rounds) and are never returned in any response.
           Protected routes require <code style={{ background: '#f3f4f6', padding: '1px 6px', borderRadius: 4, fontFamily: 'SF Mono, monospace', fontSize: 12 }}>Authorization: Bearer &lt;token&gt;</code>.
         </p>
@@ -345,7 +398,7 @@ export default function Users() {
   const handleSave = async (data) => {
     try {
       if (modal.mode === 'edit') await api.update('users', modal.data.id, data);
-      else                       await api.create('users', data);
+      else                       await api.adminCreateUser(data);
       setModal(null);
       load();
     } catch (e) { setError(e.message); }
@@ -472,7 +525,12 @@ function UserModal({ mode, initial, onSave, onClose }) {
     email:        initial?.email        ?? '',
     display_name: initial?.display_name ?? '',
     role:         initial?.role         ?? 'user',
+    password:     '',
   });
+  const [resetPw, setResetPw]     = useState('');
+  const [pwError, setPwError]     = useState(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const [savingPw, setSavingPw]   = useState(false);
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
@@ -482,7 +540,27 @@ function UserModal({ mode, initial, onSave, onClose }) {
     if (form.email)        data.email        = form.email;
     if (form.display_name) data.display_name = form.display_name;
     if (form.role)         data.role         = form.role;
+    if (mode === 'create') data.password     = form.password;
     onSave(data);
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPw || resetPw.length < 8) {
+      setPwError('Password must be at least 8 characters');
+      return;
+    }
+    setSavingPw(true);
+    setPwError(null);
+    try {
+      await api.adminSetPassword(initial.id, resetPw);
+      setPwSuccess(true);
+      setResetPw('');
+      setTimeout(() => setPwSuccess(false), 3000);
+    } catch (e) {
+      setPwError(e.message);
+    } finally {
+      setSavingPw(false);
+    }
   };
 
   return (
@@ -508,6 +586,45 @@ function UserModal({ mode, initial, onSave, onClose }) {
                 {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
+            {mode === 'create' && (
+              <div className="form-group">
+                <label>Password <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={e => set('password', e.target.value)}
+                  required
+                  minLength={8}
+                  placeholder="Min 8 chars, 1 letter + 1 number"
+                />
+              </div>
+            )}
+            {mode === 'edit' && (
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+                  Reset Password
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="password"
+                    value={resetPw}
+                    onChange={e => { setResetPw(e.target.value); setPwError(null); setPwSuccess(false); }}
+                    placeholder="New password"
+                    style={{ flex: 1, fontSize: 13 }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={handleResetPassword}
+                    disabled={savingPw}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    {savingPw ? '…' : pwSuccess ? '✓ Saved' : 'Set Password'}
+                  </button>
+                </div>
+                {pwError && <div style={{ color: 'var(--danger)', fontSize: 12, marginTop: 4 }}>{pwError}</div>}
+              </div>
+            )}
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>

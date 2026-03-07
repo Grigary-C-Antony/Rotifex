@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { isAuthenticated, getUser, clearTokens } from "./auth";
+import { api } from "./api";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Models from "./pages/Models";
@@ -45,7 +46,8 @@ export default function App() {
     setAuthed(true);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try { await api.logout(); } catch { /* best-effort — always clear local state */ }
     clearTokens();
     setAuthed(false);
     setUser(null);

@@ -30,6 +30,16 @@ npx rotifex start
 | ------- | ------------------------------------ |
 | `start` | Start the Rotifex development server |
 
+### `start` flags
+
+| Flag              | Description                                                          |
+| ----------------- | -------------------------------------------------------------------- |
+| `-p, --port <n>`  | TCP port to listen on (overrides `ROTIFEX_PORT` and auto-fallback)  |
+| `--host <host>`   | Bind address (overrides `ROTIFEX_HOST`)                             |
+| `--verbose`       | Enable debug-level logging                                          |
+
+**Port auto-fallback:** If no port is explicitly set, Rotifex tries port `4994`, then `4995`, then `4996`. If all three are occupied it exits with a clear error. Pass `--port` or set `ROTIFEX_PORT` to pin a specific port and skip the fallback.
+
 ## Table of Contents
 
 1. [Application Overview](#1-application-overview)
@@ -116,7 +126,7 @@ Rotifex eliminates boilerplate for backend development. Instead of writing CRUD 
 **How it works:**
 
 1. `schema.json` is parsed by `schemaLoader.js` into normalized model definitions.
-2. `tableSync.js` runs `CREATE TABLE IF NOT EXISTS` for each model.
+2. `tableSync.js` runs `CREATE TABLE IF NOT EXISTS` for each model. On subsequent startups it **automatically adds missing columns** via `ALTER TABLE ADD COLUMN` — no manual migrations needed when fields are added to an existing model.
 3. `routeFactory.js` registers generic parametric routes (`/api/:table`) that resolve the model from an in-memory store at request time.
 4. When a model is added/removed via the admin API, the in-memory store is updated and routes resolve immediately.
 
@@ -154,16 +164,20 @@ Rotifex eliminates boilerplate for backend development. Instead of writing CRUD 
 
 ### 2.2 JWT Authentication
 
-**Description:** Full authentication system with access tokens, refresh tokens, password hashing, and role-based access control.
+**Description:** Full authentication system with access tokens, refresh tokens, token rotation, logout/revocation, password hashing, and role-based access control.
 
 **Use case:** Secure user registration and login for a Rotifex-backed application. Protect admin routes from regular users.
 
 **How it works:**
 
-1. `POST /auth/register` hashes the password with bcrypt and inserts a user row.
-2. `POST /auth/login` verifies credentials and issues a short-lived access token (1 hour) and long-lived refresh token (30 days).
+1. `POST /auth/register` hashes the password with bcrypt (12 rounds) and inserts a user row.
+2. `POST /auth/login` verifies credentials and issues a short-lived access token and long-lived refresh token.
 3. The JWT middleware runs on every request, verifies the `Authorization: Bearer` header, and injects `x-user-id` / `x-user-role` headers that downstream routes use for authorization.
-4. `POST /auth/refresh` issues a new token pair without requiring the password.
+4. `POST /auth/refresh` issues a new token pair and **revokes the consumed refresh token** (single-use rotation). Each refresh token embeds a unique `jti` (JWT ID) used for targeted revocation.
+5. `POST /auth/logout` invalidates the provided refresh token immediately.
+6. `POST /auth/change-password` lets an authenticated user change their own password.
+
+**Token TTLs are configurable** via env vars (see Section 10). Defaults: access token 60 minutes, refresh token 30 days. The refresh TTL must be at least 2× the access TTL and no shorter than 2 hours.
 
 **Roles:** `user` (default) and `admin`. Admin access is required for all `/admin/api/*` endpoints.
 
@@ -252,7 +266,7 @@ Rotifex eliminates boilerplate for backend development. Instead of writing CRUD 
 ### Base URL
 
 ```
-http://localhost:3000
+http://localhost:4994
 ```
 
 All API responses follow the envelope format:
@@ -375,7 +389,7 @@ Authenticate and receive tokens.
 
 #### `POST /auth/refresh`
 
-Exchange a refresh token for a new token pair.
+Exchange a refresh token for a new token pair. The consumed refresh token is immediately revoked (single-use rotation).
 
 **Auth:** None
 
@@ -400,10 +414,61 @@ Exchange a refresh token for a new token pair.
 
 **Errors:**
 
+| Code  | Reason                                       |
+| ----- | -------------------------------------------- |
+| `400` | Missing refreshToken                         |
+| `401` | Invalid, expired, or already-revoked token   |
+
+---
+
+#### `POST /auth/logout`
+
+Revoke a refresh token. After this call the token cannot be used to issue new pairs.
+
+**Auth:** None
+
+**Request Body:**
+
+```json
+{
+  "refreshToken": "<jwt>"
+}
+```
+
+**Response `204`:** No content.
+
+**Errors:**
+
 | Code  | Reason                           |
 | ----- | -------------------------------- |
-| `400` | Missing refreshToken             |
-| `401` | Invalid or expired refresh token |
+| `400` | Missing or invalid refreshToken  |
+
+---
+
+#### `POST /auth/change-password`
+
+Change the authenticated user's own password.
+
+**Auth:** `Authorization: Bearer <accessToken>`
+
+**Request Body:**
+
+```json
+{
+  "currentPassword": "old-password",
+  "newPassword": "new-password123"
+}
+```
+
+**Response `204`:** No content.
+
+**Errors:**
+
+| Code  | Reason                              |
+| ----- | ----------------------------------- |
+| `400` | Missing fields or weak new password |
+| `401` | Wrong current password / bad token  |
+| `404` | User not found                      |
 
 ---
 
@@ -698,7 +763,7 @@ Generate a time-limited signed URL for a private file.
 ```json
 {
   "data": {
-    "url": "http://localhost:3000/files/uuid/download?token=abc123&expires=1741300000",
+    "url": "http://localhost:4994/files/uuid/download?token=abc123&expires=1741300000",
     "expires": 1741300000
   }
 }
@@ -1122,7 +1187,7 @@ Read current environment/config values.
 {
   "data": {
     "JWT_SECRET": "***",
-    "ROTIFEX_PORT": "3000",
+    "ROTIFEX_PORT": "4994",
     "ROTIFEX_CORS_ORIGIN": "*"
   }
 }
@@ -1290,10 +1355,14 @@ Client                          Rotifex Server
 
 ### Token Details
 
-| Token         | Algorithm | TTL     | Secret Env Var       |
-| ------------- | --------- | ------- | -------------------- |
-| Access Token  | HS256     | 1 hour  | `JWT_SECRET`         |
-| Refresh Token | HS256     | 30 days | `JWT_REFRESH_SECRET` |
+| Token         | Algorithm | Default TTL | TTL Env Var                   | Secret Env Var       |
+| ------------- | --------- | ----------- | ----------------------------- | -------------------- |
+| Access Token  | HS256     | 60 min      | `ROTIFEX_ACCESS_TOKEN_TTL`    | `JWT_SECRET`         |
+| Refresh Token | HS256     | 30 days     | `ROTIFEX_REFRESH_TOKEN_TTL`   | `JWT_REFRESH_SECRET` |
+
+TTLs are in **minutes**. The refresh TTL must be ≥ 2× the access TTL and ≥ 120 minutes. Both can be tuned in the admin **Settings** page or via `.env`.
+
+Refresh tokens embed a unique `jti` (JWT ID) enabling individual revocation. Token rotation is enforced — each refresh token is single-use.
 
 Secrets are auto-generated and saved to `.env` on first startup if not explicitly set.
 
@@ -1569,7 +1638,9 @@ Signed URLs are generated via `GET /files/:id/signed-url`. The default TTL is 1 
 ### User Management
 
 - List all registered users: email, display name, role, creation date
-- Admin actions on user accounts
+- **Create user** — "New User" modal with email, password, display name, and role
+- **Reset password** — inline "Reset Password" section inside the edit modal (admin force-sets any user's password)
+- Password validation enforced: minimum 8 characters, at least one letter and one number
 
 ### File Browser
 
@@ -1607,17 +1678,21 @@ Signed URLs are generated via `GET /files/:id/signed-url`. The default TTL is 1 
 
 Editable via admin panel — writes to `.env`:
 
-| Variable                            | Description                  |
-| ----------------------------------- | ---------------------------- |
-| `JWT_SECRET`                        | Access token signing secret  |
-| `JWT_REFRESH_SECRET`                | Refresh token signing secret |
-| `ROTIFEX_PORT`                      | Server port                  |
-| `ROTIFEX_HOST`                      | Server bind host             |
-| `ROTIFEX_CORS_ORIGIN`               | Allowed CORS origin(s)       |
-| `ROTIFEX_RATE_LIMIT_MAX`            | Max requests per time window |
-| `ROTIFEX_LOG_LEVEL`                 | Log verbosity                |
-| `ROTIFEX_STORAGE_MAX_FILE_SIZE_MB`  | Max upload size in MB        |
-| `ROTIFEX_STORAGE_SIGNED_URL_SECRET` | HMAC secret for signed URLs  |
+| Variable                            | Description                                                     |
+| ----------------------------------- | --------------------------------------------------------------- |
+| `ROTIFEX_ACCESS_TOKEN_TTL`          | Access token lifetime in minutes (min 5, default 60)           |
+| `ROTIFEX_REFRESH_TOKEN_TTL`         | Refresh token lifetime in minutes (min 120 and ≥ 2×access, default 43200) |
+| `JWT_SECRET`                        | Access token signing secret                                     |
+| `JWT_REFRESH_SECRET`                | Refresh token signing secret                                    |
+| `ROTIFEX_PORT`                      | Server port                                                     |
+| `ROTIFEX_HOST`                      | Server bind host                                                |
+| `ROTIFEX_CORS_ORIGIN`               | Allowed CORS origin(s)                                          |
+| `ROTIFEX_RATE_LIMIT_MAX`            | Max requests per time window                                    |
+| `ROTIFEX_LOG_LEVEL`                 | Log verbosity                                                   |
+| `ROTIFEX_STORAGE_MAX_FILE_SIZE_MB`  | Max upload size in MB                                           |
+| `ROTIFEX_STORAGE_SIGNED_URL_SECRET` | HMAC secret for signed URLs                                     |
+
+The **Token Timing** card validates constraints live: refresh TTL must be ≥ 2× access TTL and ≥ 120 minutes. The Save button is disabled until all errors are resolved.
 
 ---
 
@@ -1669,29 +1744,33 @@ Validation errors may return an array for `message`:
 
 ### Environment Variables Reference
 
-| Variable                            | Default   | Description                                  |
-| ----------------------------------- | --------- | -------------------------------------------- |
-| `ROTIFEX_PORT`                      | `3000`    | TCP port                                     |
-| `ROTIFEX_HOST`                      | `0.0.0.0` | Bind address                                 |
-| `ROTIFEX_CORS_ORIGIN`               | `*`       | Allowed CORS origin                          |
-| `ROTIFEX_RATE_LIMIT_MAX`            | `100`     | Max requests per rate-limit window           |
-| `ROTIFEX_LOG_LEVEL`                 | `info`    | Log level (`info`, `debug`, `warn`, `error`) |
-| `ROTIFEX_STORAGE_MAX_FILE_SIZE_MB`  | `10`      | Max upload size in MB                        |
-| `ROTIFEX_STORAGE_SIGNED_URL_SECRET` | auto      | HMAC secret for signed file URLs             |
-| `JWT_SECRET`                        | auto      | Access token signing secret                  |
-| `JWT_REFRESH_SECRET`                | auto      | Refresh token signing secret                 |
+| Variable                            | Default   | Description                                                        |
+| ----------------------------------- | --------- | ------------------------------------------------------------------ |
+| `ROTIFEX_PORT`                      | `4994`    | TCP port (auto-tries 4994 → 4995 → 4996 if unset)                |
+| `ROTIFEX_HOST`                      | `0.0.0.0` | Bind address                                                       |
+| `ROTIFEX_CORS_ORIGIN`               | `*`       | Allowed CORS origin                                                |
+| `ROTIFEX_RATE_LIMIT_MAX`            | `100`     | Max requests per rate-limit window                                 |
+| `ROTIFEX_LOG_LEVEL`                 | `info`    | Log level (`info`, `debug`, `warn`, `error`)                      |
+| `ROTIFEX_STORAGE_MAX_FILE_SIZE_MB`  | `10`      | Max upload size in MB                                              |
+| `ROTIFEX_STORAGE_SIGNED_URL_SECRET` | auto      | HMAC secret for signed file URLs                                   |
+| `ROTIFEX_ACCESS_TOKEN_TTL`          | `60`      | Access token TTL in minutes (min 5)                               |
+| `ROTIFEX_REFRESH_TOKEN_TTL`         | `43200`   | Refresh token TTL in minutes (min 120, must be ≥ 2× access TTL)  |
+| `JWT_SECRET`                        | auto      | Access token signing secret                                        |
+| `JWT_REFRESH_SECRET`                | auto      | Refresh token signing secret                                       |
 
 > `JWT_SECRET`, `JWT_REFRESH_SECRET`, and `ROTIFEX_STORAGE_SIGNED_URL_SECRET` are auto-generated on first startup if absent and saved to `.env`.
 
 ### Example `.env`
 
 ```env
-ROTIFEX_PORT=3000
+ROTIFEX_PORT=4994
 ROTIFEX_HOST=0.0.0.0
 ROTIFEX_CORS_ORIGIN=https://myapp.com
 ROTIFEX_RATE_LIMIT_MAX=200
 ROTIFEX_LOG_LEVEL=info
 ROTIFEX_STORAGE_MAX_FILE_SIZE_MB=25
+ROTIFEX_ACCESS_TOKEN_TTL=60
+ROTIFEX_REFRESH_TOKEN_TTL=43200
 JWT_SECRET=replace-with-a-long-random-string
 JWT_REFRESH_SECRET=replace-with-another-long-random-string
 ROTIFEX_STORAGE_SIGNED_URL_SECRET=replace-with-yet-another-secret
@@ -1717,10 +1796,10 @@ npm install
 ### Running in Development
 
 ```bash
-# Default port 3000
+# Default port 4994 (falls back to 4995, 4996 if in use)
 npx rotifex start
 
-# Custom port
+# Pin a specific port (skips auto-fallback)
 npx rotifex start --port 4000
 
 # Custom host
@@ -1772,7 +1851,7 @@ server {
   server_name api.yourapp.com;
 
   location / {
-    proxy_pass http://127.0.0.1:3000;
+    proxy_pass http://127.0.0.1:4994;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-Proto $scheme;
@@ -1795,12 +1874,12 @@ cp rotifex.db rotifex.db.backup
 
 ```bash
 # Register
-curl -X POST http://localhost:3000/auth/register \
+curl -X POST http://localhost:4994/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"jane@example.com","password":"secure123","display_name":"Jane"}'
 
 # Login — save the returned accessToken
-curl -X POST http://localhost:3000/auth/login \
+curl -X POST http://localhost:4994/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"jane@example.com","password":"secure123"}'
 
@@ -1814,7 +1893,7 @@ export TOKEN="<accessToken from response>"
 
 ```bash
 # 1. Create model (admin role required)
-curl -X POST http://localhost:3000/admin/api/schema \
+curl -X POST http://localhost:4994/admin/api/schema \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
@@ -1827,23 +1906,23 @@ curl -X POST http://localhost:3000/admin/api/schema \
   }'
 
 # 2. Create a record
-curl -X POST http://localhost:3000/api/products \
+curl -X POST http://localhost:4994/api/products \
   -H "Content-Type: application/json" \
   -d '{"name":"Widget","price":9.99,"in_stock":true}'
 
 # 3. List with sort and filter
-curl "http://localhost:3000/api/products?sort=price&order=ASC&in_stock=1"
+curl "http://localhost:4994/api/products?sort=price&order=ASC&in_stock=1"
 
 # 4. Get one
-curl http://localhost:3000/api/products/<id>
+curl http://localhost:4994/api/products/<id>
 
 # 5. Update
-curl -X PUT http://localhost:3000/api/products/<id> \
+curl -X PUT http://localhost:4994/api/products/<id> \
   -H "Content-Type: application/json" \
   -d '{"price":14.99}'
 
 # 6. Delete
-curl -X DELETE http://localhost:3000/api/products/<id>
+curl -X DELETE http://localhost:4994/api/products/<id>
 ```
 
 ---
@@ -1852,22 +1931,22 @@ curl -X DELETE http://localhost:3000/api/products/<id>
 
 ```bash
 # Upload a public file
-curl -X POST http://localhost:3000/files/upload \
+curl -X POST http://localhost:4994/files/upload \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@/path/to/photo.jpg" \
   -F "visibility=public"
 
 # Download public file (no auth needed)
-curl http://localhost:3000/files/<id>/download -o photo.jpg
+curl http://localhost:4994/files/<id>/download -o photo.jpg
 
 # Upload a private file
-curl -X POST http://localhost:3000/files/upload \
+curl -X POST http://localhost:4994/files/upload \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@/path/to/document.pdf" \
   -F "visibility=private"
 
 # Get a signed URL for the private file
-curl http://localhost:3000/files/<id>/signed-url \
+curl http://localhost:4994/files/<id>/signed-url \
   -H "Authorization: Bearer $TOKEN"
 
 # Download using the signed URL
@@ -1880,7 +1959,7 @@ curl "<signed-url>" -o document.pdf
 
 ```bash
 # Generate a completion
-curl -X POST http://localhost:3000/api/ai/generate \
+curl -X POST http://localhost:4994/api/ai/generate \
   -H "Content-Type: application/json" \
   -d '{
     "provider": "openai",
@@ -1890,7 +1969,7 @@ curl -X POST http://localhost:3000/api/ai/generate \
   }'
 
 # Multi-turn chat
-curl -X POST http://localhost:3000/api/ai/chat \
+curl -X POST http://localhost:4994/api/ai/chat \
   -H "Content-Type: application/json" \
   -d '{
     "provider": "anthropic",
@@ -1907,7 +1986,7 @@ curl -X POST http://localhost:3000/api/ai/chat \
 
 ```bash
 # 1. Create an agent (admin required)
-curl -X POST http://localhost:3000/admin/api/agents \
+curl -X POST http://localhost:4994/admin/api/agents \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
@@ -1921,7 +2000,7 @@ curl -X POST http://localhost:3000/admin/api/agents \
   }'
 
 # 2. Run the agent
-curl -X POST http://localhost:3000/api/agents/<id>/run \
+curl -X POST http://localhost:4994/api/agents/<id>/run \
   -H "Content-Type: application/json" \
   -d '{"input": "What is (144 / 12) * 7.5 plus 33?"}'
 ```
@@ -1931,7 +2010,7 @@ curl -X POST http://localhost:3000/api/agents/<id>/run \
 ### Refreshing an Expired Token
 
 ```bash
-curl -X POST http://localhost:3000/auth/refresh \
+curl -X POST http://localhost:4994/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{"refreshToken":"<your-refresh-token>"}'
 ```

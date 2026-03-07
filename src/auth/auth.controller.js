@@ -1,4 +1,4 @@
-import { registerUser, loginUser, refreshTokens, getCurrentUser, validateRegistrationInput, verifyAccessToken } from './auth.service.js';
+import { registerUser, loginUser, refreshTokens, logout, changePassword, getCurrentUser, validateRegistrationInput, verifyAccessToken } from './auth.service.js';
 
 /**
  * Returns request handlers bound to the given `db` instance.
@@ -75,6 +75,55 @@ export function makeAuthController(db) {
           error: 'Token refresh failed',
           message: e.message,
           statusCode: e.statusCode ?? 401,
+        });
+      }
+    },
+
+    async logout(request, reply) {
+      const { refreshToken } = request.body ?? {};
+      await logout(db, refreshToken);
+      return reply.status(204).send();
+    },
+
+    async changePassword(request, reply) {
+      // /auth/* is skipped by the JWT middleware — verify the token manually.
+      const header = request.headers['authorization'] ?? '';
+      if (!header.startsWith('Bearer ')) {
+        return reply.status(401).send({
+          error: 'Unauthorized',
+          message: 'Authorization: Bearer <token> header is required',
+          statusCode: 401,
+        });
+      }
+
+      let payload;
+      try {
+        payload = verifyAccessToken(header.slice(7));
+      } catch {
+        return reply.status(401).send({
+          error: 'Unauthorized',
+          message: 'Invalid or expired token',
+          statusCode: 401,
+        });
+      }
+
+      const { currentPassword, newPassword } = request.body ?? {};
+      if (!currentPassword || !newPassword) {
+        return reply.status(400).send({
+          error: 'Bad Request',
+          message: 'currentPassword and newPassword are required',
+          statusCode: 400,
+        });
+      }
+
+      try {
+        await changePassword(db, payload.userId, { currentPassword, newPassword });
+        return reply.status(204).send();
+      } catch (e) {
+        return reply.status(e.statusCode ?? 500).send({
+          error: 'Password change failed',
+          message: e.message,
+          statusCode: e.statusCode ?? 500,
         });
       }
     },

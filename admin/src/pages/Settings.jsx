@@ -13,14 +13,14 @@ const SECTIONS = [
         key:     'JWT_SECRET',
         label:   'JWT Secret',
         secret:  true,
-        desc:    'Signs access tokens (1 h expiry). Must be a long random string in production.',
+        desc:    'Signs access tokens. Must be a long random string in production.',
         example: 'openssl rand -hex 32',
       },
       {
         key:     'JWT_REFRESH_SECRET',
         label:   'JWT Refresh Secret',
         secret:  true,
-        desc:    'Signs refresh tokens (30 d expiry). Use a different value from JWT_SECRET.',
+        desc:    'Signs refresh tokens. Use a different value from JWT_SECRET.',
         example: 'openssl rand -hex 32',
       },
     ],
@@ -35,7 +35,7 @@ const SECTIONS = [
         label:       'Port',
         secret:      false,
         desc:        'TCP port the server listens on.',
-        placeholder: '3000',
+        placeholder: '4994',
         type:        'number',
       },
       {
@@ -94,15 +94,138 @@ const SECTIONS = [
   },
 ];
 
+// ── Token Timing ─────────────────────────────────────────────────────────────
+
+const ACCESS_KEY  = 'ROTIFEX_ACCESS_TOKEN_TTL';
+const REFRESH_KEY = 'ROTIFEX_REFRESH_TOKEN_TTL';
+
+// Hard thresholds — must match auth.service.js constants.
+const ACCESS_MIN        = 5;    // minutes
+const REFRESH_MIN       = 120;  // minutes (2 h floor)
+const REFRESH_MULT      = 2;    // refresh >= REFRESH_MULT × access
+
+function fmtMinutes(raw) {
+  const m = Number(raw);
+  if (!m || m <= 0) return '—';
+  if (m < 60)   return `${m} min`;
+  if (m < 1440) { const h = m / 60;   return `${Number.isInteger(h) ? h : h.toFixed(1)} hr`;  }
+  const d = m / 1440; return `${Number.isInteger(d) ? d : d.toFixed(1)} day${d !== 1 ? 's' : ''}`;
+}
+
+function TokenTimingCard({ values, set, dirty, onValidChange }) {
+  const access  = Number(values[ACCESS_KEY])  || 60;
+  const refresh = Number(values[REFRESH_KEY]) || 43200;
+
+  const minRefresh   = Math.max(REFRESH_MIN, access * REFRESH_MULT);
+  const accessError  = access  < ACCESS_MIN  ? `Minimum ${ACCESS_MIN} minutes` : null;
+  const refreshError = refresh < minRefresh  ? `Must be ≥ ${REFRESH_MULT}× access TTL (min ${minRefresh} min = ${fmtMinutes(minRefresh)})` : null;
+  const hasError     = !!(accessError || refreshError);
+
+  // Notify parent whenever validity changes so the Save button can be gated.
+  useEffect(() => { onValidChange(!hasError); }, [hasError]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ color: 'var(--primary)', fontSize: 16 }}>⏱</span>
+          <div>
+            <h3 style={{ marginBottom: 2 }}>Token Timing</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400, margin: 0 }}>
+              How long tokens stay valid. Refresh token must be at least {REFRESH_MULT}× the access token TTL
+              and no shorter than {fmtMinutes(REFRESH_MIN)}. Restart required.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: '8px 20px 20px' }}>
+        {[
+          {
+            key:   ACCESS_KEY,
+            label: 'Access Token TTL',
+            desc:  `Short-lived token sent with every request. Min ${ACCESS_MIN} min.`,
+            def:   60,
+            error: accessError,
+            min:   ACCESS_MIN,
+          },
+          {
+            key:   REFRESH_KEY,
+            label: 'Refresh Token TTL',
+            desc:  `Long-lived token used to issue new access tokens. Min ${fmtMinutes(REFRESH_MIN)} and ≥ ${REFRESH_MULT}× access TTL.`,
+            def:   43200,
+            error: refreshError,
+            min:   minRefresh,
+          },
+        ].map((field, i, arr) => (
+          <div
+            key={field.key}
+            style={{
+              paddingTop: 16, paddingBottom: 16,
+              borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+              {/* Label + desc */}
+              <div style={{ flex: '0 0 220px', minWidth: 160 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{field.label}</span>
+                  {dirty[field.key] && (
+                    <span className="badge" style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: 10 }}>unsaved</span>
+                  )}
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>{field.desc}</p>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '4px 0 0', fontFamily: 'SF Mono, Fira Code, monospace' }}>
+                  {field.key}
+                </p>
+              </div>
+
+              {/* Input */}
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    className="env-input"
+                    type="number"
+                    min={field.min}
+                    step={1}
+                    value={values[field.key] ?? ''}
+                    placeholder={String(field.def)}
+                    onChange={e => set(field.key, e.target.value)}
+                    style={{ width: 90 }}
+                  />
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>minutes</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    = {fmtMinutes(Number(values[field.key]) || field.def)}
+                  </span>
+                </div>
+                {field.error && (
+                  <p style={{ fontSize: 12, color: 'var(--danger)', margin: '5px 0 0' }}>⚠ {field.error}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {hasError && (
+          <div style={{ marginTop: 12, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, fontSize: 12, color: '#991b1b' }}>
+            Resolve the errors above before saving.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function Settings() {
-  const [values, setValues]   = useState({});
-  const [reveal, setReveal]   = useState({});   // which secret fields are unmasked
-  const [dirty, setDirty]     = useState({});   // keys changed since last load
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
-  const [notice, setNotice]   = useState(null); // { type: 'success'|'error', msg }
+  const [values, setValues]         = useState({});
+  const [reveal, setReveal]         = useState({});   // which secret fields are unmasked
+  const [dirty, setDirty]           = useState({});   // keys changed since last load
+  const [loading, setLoading]       = useState(true);
+  const [saving, setSaving]         = useState(false);
+  const [notice, setNotice]         = useState(null); // { type: 'success'|'error', msg }
+  const [timingValid, setTimingValid] = useState(true);
 
   useEffect(() => {
     api.getEnv()
@@ -131,7 +254,8 @@ export default function Settings() {
     }
   };
 
-  const hasDirty = Object.keys(dirty).length > 0;
+  const hasDirty  = Object.keys(dirty).length > 0;
+  const canSave   = hasDirty && timingValid;
 
   if (loading) return <div className="empty-state"><p>Loading…</p></div>;
 
@@ -146,10 +270,10 @@ export default function Settings() {
         <button
           className="btn btn-primary btn-sm"
           onClick={handleSave}
-          disabled={saving || !hasDirty}
+          disabled={saving || !canSave}
           style={{ flexShrink: 0, marginLeft: 16 }}
         >
-          {saving ? 'Saving…' : `Save${hasDirty ? ` (${Object.keys(dirty).length})` : ''}`}
+          {saving ? 'Saving…' : hasDirty && !timingValid ? 'Fix errors to save' : `Save${hasDirty ? ` (${Object.keys(dirty).length})` : ''}`}
         </button>
       </div>
 
@@ -166,6 +290,12 @@ export default function Settings() {
 
       {/* ── Sections ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <TokenTimingCard
+          values={values}
+          set={set}
+          dirty={dirty}
+          onValidChange={setTimingValid}
+        />
         {SECTIONS.map(section => (
           <div key={section.title} className="card">
             <div className="card-header">

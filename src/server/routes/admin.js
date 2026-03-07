@@ -7,6 +7,8 @@ import { getUsageSummary } from '../../ai/ai.usage.js';
 import { upsertModel, removeModel } from '../../engine/schemaStore.js';
 import { syncTables } from '../../engine/tableSync.js';
 import { getLogs } from '../../lib/logBuffer.js';
+import { registerUser, validateRegistrationInput } from '../../auth/auth.service.js';
+import { hashPassword } from '../../auth/password.util.js';
 
 // ── .env file helpers ─────────────────────────────────────────────────────────
 
@@ -226,6 +228,52 @@ export async function adminRoutes(app, { db }) {
     return reply.status(204).send();
   });
 
+  // ── POST /admin/api/users — create user with hashed password ──────
+  app.post('/admin/api/users', async (request, reply) => {
+    const { email, password, display_name, role } = request.body || {};
+
+    const errors = validateRegistrationInput({ email: email ?? '', password: password ?? '' });
+    if (errors.length) {
+      return reply.status(400).send({ error: 'Validation Error', message: errors, statusCode: 400 });
+    }
+
+    try {
+      const user = await registerUser(db, { email, password, display_name, role: role || 'user' });
+      return reply.status(201).send({ data: user, message: 'User created successfully' });
+    } catch (e) {
+      return reply.status(e.statusCode ?? 500).send({
+        error: 'User creation failed',
+        message: e.message,
+        statusCode: e.statusCode ?? 500,
+      });
+    }
+  });
+
+  // ── PUT /admin/api/users/:id/password — admin reset a user's password ─
+  app.put('/admin/api/users/:id/password', async (request, reply) => {
+    const { id } = request.params;
+    const { password } = request.body || {};
+
+    if (!password || password.length < 8) {
+      return reply.status(400).send({
+        error: 'Bad Request',
+        message: 'Password must be at least 8 characters',
+        statusCode: 400,
+      });
+    }
+
+    const user = db.get('SELECT id FROM users WHERE id = ?', [id]);
+    if (!user) {
+      return reply.status(404).send({ error: 'Not Found', message: 'User not found', statusCode: 404 });
+    }
+
+    const password_hash = await hashPassword(password);
+    const now = new Date().toISOString();
+    db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [password_hash, now, id]);
+
+    return reply.status(204).send();
+  });
+
   // ── GET /admin/api/env — read current .env values ─────────────────
   app.get('/admin/api/env', () => {
     const fileVars = readEnvFile();
@@ -266,6 +314,8 @@ export async function adminRoutes(app, { db }) {
 const ENV_KEYS = [
   'JWT_SECRET',
   'JWT_REFRESH_SECRET',
+  'ROTIFEX_ACCESS_TOKEN_TTL',
+  'ROTIFEX_REFRESH_TOKEN_TTL',
   'ROTIFEX_PORT',
   'ROTIFEX_HOST',
   'ROTIFEX_CORS_ORIGIN',

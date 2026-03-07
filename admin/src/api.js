@@ -58,9 +58,15 @@ async function request(path, options = {}, _isRetry = false) {
 
 export const api = {
   // Auth
-  login:    (email, password)               => request('/auth/login',    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }),
-  register: (email, password, display_name, role) => request('/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, display_name, role }) }),
-  getMe:    ()                              => request('/auth/me'),
+  login:          (email, password)                     => request('/auth/login',           { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }),
+  register:       (email, password, display_name, role) => request('/auth/register',        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, display_name, role }) }),
+  logout:         ()                                    => request('/auth/logout',          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: getRefreshToken() }) }),
+  changePassword: (currentPassword, newPassword)        => request('/auth/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword, newPassword }) }),
+  getMe:          ()                                    => request('/auth/me'),
+
+  // Admin — user management
+  adminCreateUser:  (data)        => request('/admin/api/users',              { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+  adminSetPassword: (id, password) => request(`/admin/api/users/${id}/password`, { method: 'PUT',  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) }),
 
   // Admin endpoints
   getSchema:  ()      => request('/admin/api/schema'),

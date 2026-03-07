@@ -90,10 +90,12 @@ function applyEnvOverrides(config) {
     config.storage.signedUrlSecret = env.ROTIFEX_STORAGE_SIGNED_URL_SECRET;
   }
 
-  // JWT auth secrets — read directly by auth.service.js via process.env,
-  // exposed here only so config introspection tools can see them.
-  if (env.JWT_SECRET)         { config.auth = config.auth || {}; config.auth.jwtSecret        = env.JWT_SECRET; }
-  if (env.JWT_REFRESH_SECRET) { config.auth = config.auth || {}; config.auth.jwtRefreshSecret = env.JWT_REFRESH_SECRET; }
+  // JWT auth secrets and token TTLs — read directly by auth.service.js via
+  // process.env, exposed here only so config introspection tools can see them.
+  if (env.JWT_SECRET)                  { config.auth = config.auth || {}; config.auth.jwtSecret         = env.JWT_SECRET; }
+  if (env.JWT_REFRESH_SECRET)          { config.auth = config.auth || {}; config.auth.jwtRefreshSecret  = env.JWT_REFRESH_SECRET; }
+  if (env.ROTIFEX_ACCESS_TOKEN_TTL)    { config.auth = config.auth || {}; config.auth.accessTokenTTL    = Number(env.ROTIFEX_ACCESS_TOKEN_TTL); }
+  if (env.ROTIFEX_REFRESH_TOKEN_TTL)   { config.auth = config.auth || {}; config.auth.refreshTokenTTL   = Number(env.ROTIFEX_REFRESH_TOKEN_TTL); }
 
   return config;
 }
